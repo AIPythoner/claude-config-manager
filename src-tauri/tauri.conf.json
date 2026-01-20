@@ -14,11 +14,9 @@
     "windows": [
       {
         "title": "Claude Config Manager",
-        "width": 420,
-        "height": 500,
-        "resizable": true,
-        "minWidth": 360,
-        "minHeight": 400,
+        "width": 380,
+        "height": 520,
+        "resizable": false,
         "center": true,
         "decorations": true
       }
