@@ -65,12 +65,40 @@ fn broadcast_settings_change() {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
 
-    let _environment: Vec<u16> = OsStr::new("Environment")
+    let environment: Vec<u16> = OsStr::new("Environment")
         .encode_wide()
         .chain(std::iter::once(0))
         .collect();
-    // Note: For full functionality, you'd call SendMessageTimeoutW here
-    // This simplified version works but new terminals need to be opened to see changes
+
+    unsafe {
+        const HWND_BROADCAST: isize = 0xffff;
+        const WM_SETTINGCHANGE: u32 = 0x001A;
+        const SMTO_ABORTIFHUNG: u32 = 0x0002;
+
+        #[link(name = "user32")]
+        extern "system" {
+            fn SendMessageTimeoutW(
+                hwnd: isize,
+                msg: u32,
+                wparam: usize,
+                lparam: *const u16,
+                flags: u32,
+                timeout: u32,
+                result: *mut usize,
+            ) -> isize;
+        }
+
+        let mut result: usize = 0;
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            environment.as_ptr(),
+            SMTO_ABORTIFHUNG,
+            5000, // 5 seconds timeout
+            &mut result,
+        );
+    }
 }
 
 #[cfg(target_os = "windows")]
