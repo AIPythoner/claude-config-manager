@@ -56,12 +56,16 @@ async function deleteConfig(id: string) {
 }
 
 async function activateConfig(id: string) {
+  showLoading("正在切换配置...");
   try {
     await invoke("activate_config", { id });
     await loadConfigs();
+    hideLoading();
     showToast("配置已激活");
   } catch (e) {
     console.error("Failed to activate config:", e);
+    hideLoading();
+    showToast("切换失败");
   }
 }
 
@@ -188,6 +192,26 @@ function closeModal() {
 function editConfig(id: string) {
   const config = configs.find((c) => c.id === id);
   if (config) openModal(config);
+}
+
+function showLoading(message: string = "切换中...") {
+  const existing = document.querySelector(".loading-overlay");
+  if (existing) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "loading-overlay";
+  overlay.innerHTML = `
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <div class="loading-text">${escapeHtml(message)}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function hideLoading() {
+  const overlay = document.querySelector(".loading-overlay");
+  if (overlay) overlay.remove();
 }
 
 function showToast(message: string) {
