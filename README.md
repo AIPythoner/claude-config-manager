@@ -1,21 +1,23 @@
 # Claude Config Manager
 
-一个用于管理 Claude Code 配置的桌面应用，通过修改 Windows 环境变量来切换不同的 API 配置。
+一个用于管理多种 AI 工具配置的桌面应用，支持 Claude Code、Gemini CLI、Codex CLI，通过修改配置文件和环境变量来切换不同的 API 配置。
 
 ## 功能特性
 
+- **多平台支持** - 支持 Claude Code、Gemini CLI、Codex CLI 三种 AI 工具
 - **多配置管理** - 支持添加、编辑、删除多个配置
-- **一键切换** - 点击配置项即可激活，自动设置环境变量
+- **一键切换** - 点击配置项即可激活，自动设置对应工具的配置
 - **流畅体验** - 配置切换时显示优雅的loading动画，支持窗口拖动
 - **持久化存储** - 配置保存在本地，重启后依然有效
-- **简洁界面** - 小窗口设计，轻快明亮配色
+- **简洁界面** - 小窗口设计，轻快明亮配色，卡片式配置展示
 
-## 支持的环境变量
+## 支持的 AI 工具
 
-| 变量名 | 说明 |
-|--------|------|
-| `ANTHROPIC_AUTH_TOKEN` | Claude API 认证令牌 |
-| `ANTHROPIC_BASE_URL` | API 基础 URL（可选，用于自定义端点） |
+| 工具 | 配置方式 | 说明 |
+|------|----------|------|
+| **Claude Code** | 环境变量 | 设置 `ANTHROPIC_AUTH_TOKEN` 和 `ANTHROPIC_BASE_URL` |
+| **Gemini CLI** | 配置文件 | 写入 `~/.opencode/config.json` |
+| **Codex CLI** | 配置文件 | 写入 `~/.codex/auth.json` |
 
 ## 环境要求
 
@@ -97,13 +99,14 @@ claude-config-manager/
 ## 使用说明
 
 1. 启动应用后，点击右上角「添加」按钮
-2. 填写配置信息：
+2. 选择配置类型（Claude / Gemini / Codex）
+3. 填写配置信息：
    - **配置名称**：便于识别的名称，如"个人账户"、"公司账户"
-   - **ANTHROPIC_AUTH_TOKEN**：你的 API Token
-   - **ANTHROPIC_BASE_URL**：可选，自定义 API 地址
-3. 点击「添加」保存配置
-4. 点击配置项即可激活，绿色标记表示当前激活的配置
-5. 打开新的终端窗口，环境变量已生效
+   - **API Key**：对应工具的 API 密钥
+   - **Base URL**：可选，自定义 API 地址
+4. 点击「添加」保存配置
+5. 点击配置项即可激活，绿色标记表示当前激活的配置
+6. 根据不同工具类型，配置会自动写入对应位置
 
 ## 常见问题
 
