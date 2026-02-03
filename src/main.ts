@@ -1,15 +1,32 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+type ConfigType = "claude" | "gemini" | "codex";
 
 interface Config {
   id: string;
   name: string;
-  auth_token: string;
+  config_type: ConfigType;
+  api_key: string;
   base_url: string;
   is_active: boolean;
 }
 
+const CONFIG_TYPE_LABELS: Record<ConfigType, string> = {
+  claude: "Claude",
+  gemini: "Gemini",
+  codex: "Codex",
+};
+
+const CONFIG_TYPE_COLORS: Record<ConfigType, string> = {
+  claude: "#f97316", // orange
+  gemini: "#3b82f6", // blue
+  codex: "#8b5cf6", // purple
+};
+
 let configs: Config[] = [];
 let editingConfig: Config | null = null;
+let currentTab: ConfigType | "opencode" = "claude";
 
 async function loadConfigs() {
   try {
@@ -26,13 +43,14 @@ async function saveConfig(config: Omit<Config, "id" | "is_active">) {
       await invoke("update_config", {
         id: editingConfig.id,
         name: config.name,
-        authToken: config.auth_token,
+        apiKey: config.api_key,
         baseUrl: config.base_url,
       });
     } else {
       await invoke("add_config", {
         name: config.name,
-        authToken: config.auth_token,
+        configType: config.config_type,
+        apiKey: config.api_key,
         baseUrl: config.base_url,
       });
     }
@@ -69,14 +87,75 @@ async function activateConfig(id: string) {
   }
 }
 
+async function applyOpenCodeConfig() {
+  const claudeSelect = document.getElementById("opencode-claude") as HTMLSelectElement;
+  const geminiSelect = document.getElementById("opencode-gemini") as HTMLSelectElement;
+  const codexSelect = document.getElementById("opencode-codex") as HTMLSelectElement;
+
+  const claudeId = claudeSelect?.value || null;
+  const geminiId = geminiSelect?.value || null;
+  const codexId = codexSelect?.value || null;
+
+  if (!claudeId && !geminiId && !codexId) {
+    showToast("请至少选择一个配置");
+    return;
+  }
+
+  showLoading("正在应用 OpenCode 配置...");
+  try {
+    await invoke("apply_opencode_config", {
+      claudeId: claudeId || null,
+      geminiId: geminiId || null,
+      codexId: codexId || null,
+    });
+    hideLoading();
+    showToast("OpenCode 配置已应用");
+  } catch (e) {
+    console.error("Failed to apply opencode config:", e);
+    hideLoading();
+    showToast("应用失败: " + e);
+  }
+}
+
+function getConfigsByType(type: ConfigType): Config[] {
+  return configs.filter((c) => c.config_type === type);
+}
+
+function getKeyLabel(type: ConfigType): string {
+  switch (type) {
+    case "claude":
+      return "ANTHROPIC_AUTH_TOKEN";
+    case "gemini":
+      return "GEMINI_API_KEY";
+    case "codex":
+      return "API Key";
+  }
+}
+
+function getUrlLabel(type: ConfigType): string {
+  switch (type) {
+    case "claude":
+      return "ANTHROPIC_BASE_URL";
+    case "gemini":
+      return "GOOGLE_GEMINI_BASE_URL";
+    case "codex":
+      return "Base URL";
+  }
+}
+
 function renderConfigs() {
   const app = document.getElementById("app")!;
-  const activeConfig = configs.find((c) => c.is_active);
+
+  const tabConfigs = currentTab === "opencode" ? [] : getConfigsByType(currentTab);
+  const activeConfig = tabConfigs.find((c) => c.is_active);
 
   app.innerHTML = `
-    <div class="header">
-      <h1>Claude Config Manager</h1>
+    <div class="header" id="drag-region">
+      <h1>Config Manager</h1>
       <div class="header-actions">
+        ${
+          currentTab !== "opencode"
+            ? `
         <button class="btn btn-primary" onclick="openModal()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -84,26 +163,71 @@ function renderConfigs() {
           </svg>
           添加
         </button>
+        `
+            : ""
+        }
       </div>
     </div>
 
-    <div class="config-list">
+    <div class="tabs">
+      <button class="tab ${currentTab === "claude" ? "active" : ""}" onclick="switchTab('claude')" style="--tab-color: ${CONFIG_TYPE_COLORS.claude}">
+        Claude
+      </button>
+      <button class="tab ${currentTab === "gemini" ? "active" : ""}" onclick="switchTab('gemini')" style="--tab-color: ${CONFIG_TYPE_COLORS.gemini}">
+        Gemini
+      </button>
+      <button class="tab ${currentTab === "codex" ? "active" : ""}" onclick="switchTab('codex')" style="--tab-color: ${CONFIG_TYPE_COLORS.codex}">
+        Codex
+      </button>
+      <button class="tab ${currentTab === "opencode" ? "active" : ""}" onclick="switchTab('opencode')" style="--tab-color: #10b981">
+        OpenCode
+      </button>
+    </div>
+
+    ${currentTab === "opencode" ? renderOpenCodePanel() : renderConfigList(tabConfigs)}
+
+    <div class="status-bar">
+      <span>共 ${configs.length} 个配置</span>
       ${
-        configs.length === 0
+        currentTab !== "opencode"
           ? `
+      <span class="${activeConfig ? "status-active" : ""}">
+        ${activeConfig ? `当前: ${escapeHtml(activeConfig.name)}` : "未激活配置"}
+      </span>
+      `
+          : '<span class="status-active">选择配置并应用</span>'
+      }
+    </div>
+  `;
+
+  setupDragRegion();
+}
+
+function renderConfigList(tabConfigs: Config[]): string {
+  if (tabConfigs.length === 0) {
+    return `
+      <div class="config-list">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
           </svg>
-          <p>暂无配置，点击上方添加按钮创建</p>
+          <p>暂无 ${CONFIG_TYPE_LABELS[currentTab as ConfigType]} 配置</p>
         </div>
-      `
-          : configs
-              .map(
-                (config) => `
-        <div class="config-item ${config.is_active ? "active" : ""}" onclick="activateConfig('${config.id}')">
+      </div>
+    `;
+  }
+
+  return `
+    <div class="config-list">
+      ${tabConfigs
+        .map(
+          (config) => `
+        <div class="config-item ${config.is_active ? "active" : ""}" onclick="activateConfig('${config.id}')" style="--type-color: ${CONFIG_TYPE_COLORS[config.config_type]}">
           <div class="config-header">
-            <span class="config-name">${escapeHtml(config.name)}</span>
+            <div class="config-name-wrapper">
+              <span class="config-type-badge" style="background: ${CONFIG_TYPE_COLORS[config.config_type]}">${CONFIG_TYPE_LABELS[config.config_type]}</span>
+              <span class="config-name">${escapeHtml(config.name)}</span>
+            </div>
             <div class="config-actions">
               ${config.is_active ? '<span class="active-badge">当前</span>' : ""}
               <button class="btn btn-icon" onclick="event.stopPropagation(); editConfig('${config.id}')" title="编辑">
@@ -121,27 +245,82 @@ function renderConfigs() {
             </div>
           </div>
           <div class="config-details">
-            <p><strong>Token:</strong> ${maskToken(config.auth_token)}</p>
+            <p><strong>Key:</strong> ${maskToken(config.api_key)}</p>
             <p><strong>URL:</strong> ${escapeHtml(config.base_url) || "默认"}</p>
           </div>
         </div>
       `
-              )
-              .join("")
-      }
-    </div>
-
-    <div class="status-bar">
-      <span>共 ${configs.length} 个配置</span>
-      <span class="${activeConfig ? "status-active" : ""}">
-        ${activeConfig ? `当前: ${escapeHtml(activeConfig.name)}` : "未激活配置"}
-      </span>
+        )
+        .join("")}
     </div>
   `;
 }
 
+function renderOpenCodePanel(): string {
+  const claudeConfigs = getConfigsByType("claude");
+  const geminiConfigs = getConfigsByType("gemini");
+  const codexConfigs = getConfigsByType("codex");
+
+  return `
+    <div class="opencode-panel">
+      <div class="opencode-info">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4"/>
+          <path d="M12 8h.01"/>
+        </svg>
+        <p>从已有配置中选择，生成 OpenCode 配置文件</p>
+      </div>
+
+      <div class="opencode-selects">
+        <div class="form-group">
+          <label for="opencode-claude">Claude 配置</label>
+          <select id="opencode-claude">
+            <option value="">-- 不使用 --</option>
+            ${claudeConfigs.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="opencode-gemini">Gemini 配置</label>
+          <select id="opencode-gemini">
+            <option value="">-- 不使用 --</option>
+            ${geminiConfigs.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="opencode-codex">Codex/OpenAI 配置</label>
+          <select id="opencode-codex">
+            <option value="">-- 不使用 --</option>
+            ${codexConfigs.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full" onclick="applyOpenCodeConfig()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12l5 5L20 7"/>
+        </svg>
+        应用到 OpenCode
+      </button>
+
+      <div class="opencode-path">
+        <small>配置将写入: ~/.config/opencode/opencode.json</small>
+      </div>
+    </div>
+  `;
+}
+
+function switchTab(tab: ConfigType | "opencode") {
+  currentTab = tab;
+  renderConfigs();
+}
+
 function openModal(config?: Config) {
   editingConfig = config || null;
+  const configType = config?.config_type || (currentTab === "opencode" ? "claude" : currentTab);
+
   const modal = document.createElement("div");
   modal.className = "modal-overlay";
   modal.id = "modal";
@@ -153,13 +332,27 @@ function openModal(config?: Config) {
           <label for="name">配置名称</label>
           <input type="text" id="name" placeholder="例如: 个人账户" value="${escapeHtml(config?.name || "")}" required>
         </div>
+        ${
+          !config
+            ? `
         <div class="form-group">
-          <label for="auth_token">ANTHROPIC_AUTH_TOKEN</label>
-          <input type="password" id="auth_token" placeholder="sk-ant-..." value="${config?.auth_token || ""}" required>
+          <label for="config_type">配置类型</label>
+          <select id="config_type" required>
+            <option value="claude" ${configType === "claude" ? "selected" : ""}>Claude</option>
+            <option value="gemini" ${configType === "gemini" ? "selected" : ""}>Gemini</option>
+            <option value="codex" ${configType === "codex" ? "selected" : ""}>Codex</option>
+          </select>
+        </div>
+        `
+            : ""
+        }
+        <div class="form-group">
+          <label for="api_key" id="key-label">${getKeyLabel(configType as ConfigType)}</label>
+          <input type="password" id="api_key" placeholder="sk-..." value="${config?.api_key || ""}" required>
         </div>
         <div class="form-group">
-          <label for="base_url">ANTHROPIC_BASE_URL (可选)</label>
-          <input type="text" id="base_url" placeholder="https://api.anthropic.com" value="${escapeHtml(config?.base_url || "")}">
+          <label for="base_url" id="url-label">${getUrlLabel(configType as ConfigType)} (可选)</label>
+          <input type="text" id="base_url" placeholder="https://api.example.com" value="${escapeHtml(config?.base_url || "")}">
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
@@ -170,12 +363,25 @@ function openModal(config?: Config) {
   `;
   document.body.appendChild(modal);
 
+  // Update labels when type changes
+  const typeSelect = document.getElementById("config_type") as HTMLSelectElement;
+  if (typeSelect) {
+    typeSelect.addEventListener("change", () => {
+      const type = typeSelect.value as ConfigType;
+      document.getElementById("key-label")!.textContent = getKeyLabel(type);
+      document.getElementById("url-label")!.textContent = getUrlLabel(type) + " (可选)";
+    });
+  }
+
   document.getElementById("config-form")!.onsubmit = (e) => {
     e.preventDefault();
     const name = (document.getElementById("name") as HTMLInputElement).value;
-    const auth_token = (document.getElementById("auth_token") as HTMLInputElement).value;
+    const api_key = (document.getElementById("api_key") as HTMLInputElement).value;
     const base_url = (document.getElementById("base_url") as HTMLInputElement).value;
-    saveConfig({ name, auth_token, base_url });
+    const config_type = editingConfig
+      ? editingConfig.config_type
+      : ((document.getElementById("config_type") as HTMLSelectElement).value as ConfigType);
+    saveConfig({ name, config_type, api_key, base_url });
   };
 
   modal.onclick = (e) => {
@@ -240,12 +446,28 @@ function maskToken(token: string): string {
   return token.slice(0, 7) + "..." + token.slice(-4);
 }
 
+function setupDragRegion() {
+  const dragRegion = document.getElementById("drag-region");
+  if (dragRegion) {
+    dragRegion.addEventListener("mousedown", async (e) => {
+      const target = e.target as HTMLElement;
+      // 不拦截按钮点击
+      if (target.closest("button") || target.closest(".btn")) {
+        return;
+      }
+      await getCurrentWindow().startDragging();
+    });
+  }
+}
+
 // Expose functions to global scope for onclick handlers
 (window as any).openModal = openModal;
 (window as any).closeModal = closeModal;
 (window as any).editConfig = editConfig;
 (window as any).deleteConfig = deleteConfig;
 (window as any).activateConfig = activateConfig;
+(window as any).switchTab = switchTab;
+(window as any).applyOpenCodeConfig = applyOpenCodeConfig;
 
 // Initialize
 loadConfigs();

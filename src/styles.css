@@ -34,7 +34,7 @@ body {
 
 #app {
   padding: 14px;
-  max-width: 360px;
+  max-width: 400px;
   margin: 0 auto;
 }
 
@@ -42,13 +42,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
+  cursor: grab;
+}
+
+.header:active {
+  cursor: grabbing;
 }
 
 .header h1 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   background: linear-gradient(135deg, #10b981, #fbbf24);
   -webkit-background-clip: text;
@@ -60,6 +65,41 @@ body {
 .header-actions {
   display: flex;
   gap: 8px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.tab.active {
+  background: var(--bg-secondary);
+  color: var(--tab-color, var(--text-primary));
+  box-shadow: 0 1px 3px var(--shadow);
 }
 
 .btn {
@@ -120,11 +160,17 @@ body {
   color: #dc2626;
 }
 
+.btn-full {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+}
+
 .config-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 320px;
+  max-height: 280px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -159,7 +205,7 @@ body {
 }
 
 .config-item:hover {
-  border-color: var(--accent);
+  border-color: var(--type-color, var(--accent));
   transform: translateY(-2px);
   box-shadow: 0 4px 12px var(--shadow-hover);
 }
@@ -188,6 +234,22 @@ body {
   margin-bottom: 6px;
 }
 
+.config-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-type-badge {
+  font-size: 10px;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .config-name {
   font-weight: 700;
   font-size: 14px;
@@ -198,6 +260,7 @@ body {
 .config-actions {
   display: flex;
   gap: 4px;
+  align-items: center;
 }
 
 .config-details {
@@ -223,6 +286,55 @@ body {
   box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
 }
 
+/* OpenCode Panel */
+.opencode-panel {
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.opencode-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: var(--yellow-soft);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.opencode-info svg {
+  flex-shrink: 0;
+  color: var(--accent-hover);
+}
+
+.opencode-info p {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.opencode-selects {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.opencode-path {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.opencode-path small {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -243,7 +355,7 @@ body {
   border: 2px solid var(--border);
   border-radius: 16px;
   padding: 20px;
-  width: 320px;
+  width: 340px;
   max-width: 90vw;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
@@ -268,7 +380,8 @@ body {
   margin-bottom: 8px;
 }
 
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 11px 14px;
   background: var(--bg-card);
@@ -280,7 +393,8 @@ body {
   font-weight: 500;
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
   border-color: var(--success);
   background: var(--bg-secondary);
@@ -290,6 +404,15 @@ body {
 .form-group input::placeholder {
   color: var(--text-secondary);
   opacity: 0.6;
+}
+
+.form-group select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
 }
 
 .modal-actions {
@@ -380,7 +503,7 @@ body {
   z-index: 150;
   backdrop-filter: blur(3px);
   animation: fadeIn 0.2s ease;
-  pointer-events: none;
+  cursor: default;
 }
 
 .loading-spinner {
