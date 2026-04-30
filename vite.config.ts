@@ -3,8 +3,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
   clearScreen: false,
   server: {
+    host: "127.0.0.1",
     port: 5174,
-    strictPort: false,
+    strictPort: true,
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {

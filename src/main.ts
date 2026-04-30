@@ -9,6 +9,7 @@ interface Config {
   config_type: ConfigType;
   api_key: string;
   base_url: string;
+  model: string;
   is_active: boolean;
 }
 
@@ -45,6 +46,7 @@ async function saveConfig(config: Omit<Config, "id" | "is_active">) {
         name: config.name,
         apiKey: config.api_key,
         baseUrl: config.base_url,
+        model: config.model,
       });
     } else {
       await invoke("add_config", {
@@ -52,6 +54,7 @@ async function saveConfig(config: Omit<Config, "id" | "is_active">) {
         configType: config.config_type,
         apiKey: config.api_key,
         baseUrl: config.base_url,
+        model: config.model,
       });
     }
     await loadConfigs();
@@ -87,14 +90,30 @@ async function activateConfig(id: string) {
   }
 }
 
+async function restoreClaudeLogin() {
+  showLoading("正在恢复官方登录...");
+  try {
+    await invoke("restore_claude_login");
+    await loadConfigs();
+    hideLoading();
+    showToast("已恢复官方登录");
+  } catch (e) {
+    console.error("Failed to restore claude login:", e);
+    hideLoading();
+    showToast("恢复失败");
+  }
+}
+
 async function applyOpenCodeConfig() {
   const claudeSelect = document.getElementById("opencode-claude") as HTMLSelectElement;
   const geminiSelect = document.getElementById("opencode-gemini") as HTMLSelectElement;
   const codexSelect = document.getElementById("opencode-codex") as HTMLSelectElement;
+  const primarySelect = document.getElementById("opencode-primary") as HTMLSelectElement;
 
   const claudeId = claudeSelect?.value || null;
   const geminiId = geminiSelect?.value || null;
   const codexId = codexSelect?.value || null;
+  const primary = primarySelect?.value || "claude";
 
   if (!claudeId && !geminiId && !codexId) {
     showToast("请至少选择一个配置");
@@ -103,13 +122,14 @@ async function applyOpenCodeConfig() {
 
   showLoading("正在应用 OpenCode 配置...");
   try {
-    await invoke("apply_opencode_config", {
+    const setModel = await invoke<string | null>("apply_opencode_config", {
       claudeId: claudeId || null,
       geminiId: geminiId || null,
       codexId: codexId || null,
+      primary,
     });
     hideLoading();
-    showToast("OpenCode 配置已应用");
+    showToast(setModel ? `已应用,默认模型: ${setModel}` : "已应用(未设置默认模型)");
   } catch (e) {
     console.error("Failed to apply opencode config:", e);
     hideLoading();
@@ -154,6 +174,19 @@ function renderConfigs() {
       <h1>Config Manager</h1>
       <div class="header-actions">
         ${
+          currentTab === "claude"
+            ? `
+        <button class="btn btn-secondary btn-sm" onclick="restoreClaudeLogin()" title="清除第三方 API Key 配置，下次启动 Claude Code 将走官方 OAuth">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+          切回官方登录
+        </button>
+        `
+            : ""
+        }
+        ${
           currentTab !== "opencode"
             ? `
         <button class="btn btn-primary" onclick="openModal()">
@@ -191,8 +224,14 @@ function renderConfigs() {
       ${
         currentTab !== "opencode"
           ? `
-      <span class="${activeConfig ? "status-active" : ""}">
-        ${activeConfig ? `当前: ${escapeHtml(activeConfig.name)}` : "未激活配置"}
+      <span class="${activeConfig || currentTab === "claude" ? "status-active" : ""}">
+        ${
+          activeConfig
+            ? `当前: ${escapeHtml(activeConfig.name)}`
+            : currentTab === "claude"
+              ? "当前: 官方登录"
+              : "未激活配置"
+        }
       </span>
       `
           : '<span class="status-active">选择配置并应用</span>'
@@ -247,6 +286,7 @@ function renderConfigList(tabConfigs: Config[]): string {
           <div class="config-details">
             <p><strong>Key:</strong> ${maskToken(config.api_key)}</p>
             <p><strong>URL:</strong> ${escapeHtml(config.base_url) || "默认"}</p>
+            ${config.model ? `<p><strong>Model:</strong> ${escapeHtml(config.model)}</p>` : ""}
           </div>
         </div>
       `
@@ -296,6 +336,15 @@ function renderOpenCodePanel(): string {
             ${codexConfigs.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
           </select>
         </div>
+
+        <div class="form-group">
+          <label for="opencode-primary">默认模型来源</label>
+          <select id="opencode-primary">
+            <option value="claude">Claude</option>
+            <option value="gemini">Gemini</option>
+            <option value="codex">Codex</option>
+          </select>
+        </div>
       </div>
 
       <button class="btn btn-primary btn-full" onclick="applyOpenCodeConfig()">
@@ -330,7 +379,7 @@ function openModal(config?: Config) {
       <form id="config-form">
         <div class="form-group">
           <label for="name">配置名称</label>
-          <input type="text" id="name" placeholder="例如: 个人账户" value="${escapeHtml(config?.name || "")}" required>
+          <input type="text" id="name" placeholder="例如: 个人账户" value="${escapeHtml(config?.name || "")}" required autocomplete="off">
         </div>
         ${
           !config
@@ -348,11 +397,15 @@ function openModal(config?: Config) {
         }
         <div class="form-group">
           <label for="api_key" id="key-label">${getKeyLabel(configType as ConfigType)}</label>
-          <input type="password" id="api_key" placeholder="sk-..." value="${config?.api_key || ""}" required>
+          <input type="password" id="api_key" placeholder="sk-..." value="${escapeHtml(config?.api_key || "")}" required autocomplete="off">
         </div>
         <div class="form-group">
           <label for="base_url" id="url-label">${getUrlLabel(configType as ConfigType)} (可选)</label>
-          <input type="text" id="base_url" placeholder="https://api.example.com" value="${escapeHtml(config?.base_url || "")}">
+          <input type="text" id="base_url" placeholder="https://api.example.com" value="${escapeHtml(config?.base_url || "")}" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="model">Model (可选)</label>
+          <input type="text" id="model" placeholder="例如: claude-sonnet-4-6-20250514" value="${escapeHtml(config?.model || "")}" autocomplete="off">
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
@@ -378,10 +431,11 @@ function openModal(config?: Config) {
     const name = (document.getElementById("name") as HTMLInputElement).value;
     const api_key = (document.getElementById("api_key") as HTMLInputElement).value;
     const base_url = (document.getElementById("base_url") as HTMLInputElement).value;
+    const model = (document.getElementById("model") as HTMLInputElement).value;
     const config_type = editingConfig
       ? editingConfig.config_type
       : ((document.getElementById("config_type") as HTMLSelectElement).value as ConfigType);
-    saveConfig({ name, config_type, api_key, base_url });
+    saveConfig({ name, config_type, api_key, base_url, model });
   };
 
   modal.onclick = (e) => {
@@ -468,6 +522,7 @@ function setupDragRegion() {
 (window as any).activateConfig = activateConfig;
 (window as any).switchTab = switchTab;
 (window as any).applyOpenCodeConfig = applyOpenCodeConfig;
+(window as any).restoreClaudeLogin = restoreClaudeLogin;
 
 // Initialize
 loadConfigs();
