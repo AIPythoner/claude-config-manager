@@ -1,0 +1,82 @@
+name: Release (Hybrid Example)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            python-target: windows
+            pyinstaller-ext: .exe
+          - platform: macos-latest
+            python-target: macos
+            pyinstaller-ext: ''
+          - platform: ubuntu-22.04
+            python-target: linux
+            pyinstaller-ext: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # ========== 1. Python 打包阶段 ==========
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r requirements.txt  # 你的 Python 依赖
+
+      - name: Build Python executable with PyInstaller
+        run: |
+          pyinstaller --onefile --name backend python/main.py
+          # 产物在 dist/backend.exe (Windows) 或 dist/backend (Mac/Linux)
+
+      - name: Copy Python executable to resources
+        shell: bash
+        run: |
+          mkdir -p src-tauri/resources
+          cp dist/backend${{ matrix.pyinstaller-ext }} src-tauri/resources/
+
+      # ========== 2. Node.js / Tauri 打包阶段 ==========
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'See the assets to download and install this version.'
+          releaseDraft: true
+          prerelease: false
