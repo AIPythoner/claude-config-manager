@@ -13,7 +13,7 @@ npm run build            # frontend-only: tsc + vite build (rarely run alone)
 
 There are no tests and no linter wired up. Vite dev server runs on port **5174** (not the Tauri default 1420) — `tauri.conf.json` and `vite.config.ts` must agree on this port.
 
-Target platform is Windows only (NSIS bundle, fixed 380×520 non-resizable window). The CI workflow at `.github/workflows/release-hybrid-example.yml` is a manual-trigger multi-platform example and is not part of the normal release flow.
+The window is fixed 380×520 non-resizable on every platform. `bundle.targets = "all"` so each OS builds its native installer (NSIS on Windows, dmg on macOS, deb+AppImage on Linux). The release flow is `.github/workflows/release.yml` — triggered by pushing a `v*` tag (or manual `workflow_dispatch`); it runs four matrix jobs and publishes a draft GitHub Release. `release-hybrid-example.yml` next to it is an unrelated Python+Tauri example, not used. When cutting a release, bump the version in `package.json`, `src-tauri/Cargo.toml`, **and** `src-tauri/tauri.conf.json` (all three must agree) before tagging.
 
 ## Architecture
 

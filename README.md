@@ -23,7 +23,7 @@
 
 ## 环境要求
 
-- Windows 10/11
+- Windows 10/11、macOS 11+、或主流 Linux 发行版
 - Node.js 18+
 - Rust 1.70+
 - npm 或 pnpm
@@ -48,25 +48,19 @@ npm run tauri dev
 
 ## 打包构建
 
-### 构建安装程序（推荐）
-
 ```bash
 npm run tauri build
 ```
 
-构建完成后，安装程序位于：
-```
-src-tauri/target/release/bundle/nsis/Claude Config Manager_1.0.0_x64-setup.exe
-```
+`tauri.conf.json` 里 `bundle.targets = "all"`，每个平台会自动产出该平台的安装包，路径在 `src-tauri/target/release/bundle/`：
 
-### 仅构建 EXE
+| 平台 | 产物 |
+|------|------|
+| Windows | `bundle/nsis/Claude Config Manager_<version>_x64-setup.exe` |
+| macOS | `bundle/dmg/Claude Config Manager_<version>_x64.dmg`（或 `aarch64`） |
+| Linux | `bundle/deb/*.deb` 和 `bundle/appimage/*.AppImage` |
 
-如果只需要单独的 exe 文件（无需安装），构建后可在以下位置找到：
-```
-src-tauri/target/release/claude-config-manager.exe
-```
-
-> 注意：单独的 exe 需要 WebView2 运行时支持。安装程序版本会自动处理依赖。
+直接打 git tag `v*` 推到远程会触发 GitHub Actions 全平台打包并发布到 Releases 草稿（见 `.github/workflows/release.yml`）。
 
 ## 项目结构
 
